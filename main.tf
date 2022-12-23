@@ -24,6 +24,30 @@ resource "aws_internet_gateway" "terraform-internet-gateway" {
   }
 }
 
+# Create an Elastic IP address that will be attached to the NAT Gateway
+
+resource "aws_eip" "terraform-eip" {
+  vpc = true
+  # network_interface         = aws_network_interface.terraform-network-interface.id
+  # associate_with_private_ip = "10.0.1.50"
+  depends_on = [aws_internet_gateway.terraform-internet-gateway]
+  tags = {
+    Name = "eip-terra"
+  }
+}
+
+# Create a NAT Gateway
+
+resource "aws_nat_gateway" "terraform-nat-gateway" {
+  allocation_id = aws_eip.terraform-eip.id
+  subnet_id     = aws_subnet.terraform-public-subnet1.id
+
+  tags = {
+    Name = "nat-gateway-terra"
+  }
+  depends_on = [aws_internet_gateway.terraform-internet-gateway]
+}
+
 # Create Custom Route Table
 
 resource "aws_route_table" "terraform-route-table" {
@@ -34,9 +58,29 @@ resource "aws_route_table" "terraform-route-table" {
     gateway_id = aws_internet_gateway.terraform-internet-gateway.id
   }
 
+  # route {
+  #   cidr_block = "10.0.2.0/24"
+  #   gateway_id = aws_internet_gateway.terraform-internet-gateway.id
+  # }
+
+  # route {
+  #   cidr_block = "10.0.3.0/24"
+  #   gateway_id = aws_internet_gateway.terraform-internet-gateway.id
+  # }
+
   route {
-    ipv6_cidr_block = "::/0"
-    gateway_id      = aws_internet_gateway.terraform-internet-gateway.id
+    cidr_block     = "10.0.4.0/24"
+    nat_gateway_id = aws_nat_gateway.terraform-nat-gateway.id
+  }
+
+  route {
+    cidr_block     = "10.0.5.0/24"
+    nat_gateway_id = aws_nat_gateway.terraform-nat-gateway.id
+  }
+
+  route {
+    cidr_block     = "10.0.6.0/24"
+    nat_gateway_id = aws_nat_gateway.terraform-nat-gateway.id
   }
 
   tags = {
@@ -44,58 +88,162 @@ resource "aws_route_table" "terraform-route-table" {
   }
 }
 
-# Create Subnet-1
+# Create Public Subnet-1
 
-resource "aws_subnet" "terraform-subnet1" {
-  vpc_id                  = aws_vpc.terraform-vpc.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "us-east-1a"
+resource "aws_subnet" "terraform-public-subnet1" {
+  vpc_id     = aws_vpc.terraform-vpc.id
+  cidr_block = "10.0.1.0/24"
+  # map_public_ip_on_launch = true
+  availability_zone = "us-east-1a"
   tags = {
-    Name = "subnet1-terra"
+    Name = "public-subnet1-terra"
   }
 }
 
-# Create Subnet-2
+# Create Public Subnet-2
 
-resource "aws_subnet" "terraform-subnet2" {
-  vpc_id                  = aws_vpc.terraform-vpc.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "us-east-1b"
+resource "aws_subnet" "terraform-public-subnet2" {
+  vpc_id     = aws_vpc.terraform-vpc.id
+  cidr_block = "10.0.2.0/24"
+  # map_public_ip_on_launch = true
+  availability_zone = "us-east-1b"
   tags = {
-    Name = "subnet2-terra"
+    Name = "public-subnet2-terra"
   }
 }
 
-# Create a Subnet-3
+# Create Public Subnet-3
 
-resource "aws_subnet" "terraform-subnet3" {
-  vpc_id                  = aws_vpc.terraform-vpc.id
-  cidr_block              = "10.0.3.0/24"
-  availability_zone       = "us-east-1c"
+resource "aws_subnet" "terraform-public-subnet3" {
+  vpc_id     = aws_vpc.terraform-vpc.id
+  cidr_block = "10.0.3.0/24"
+  # map_public_ip_on_launch = true
+  availability_zone = "us-east-1c"
   tags = {
-    Name = "subnet3-terra"
+    Name = "public-subnet3-terra"
   }
 }
 
-# Associate subnet 1 with route table
+# Create Private Subnet-1
 
-resource "aws_route_table_association" "terraform-subnet1-association" {
-  subnet_id      = aws_subnet.terraform-subnet1.id
+resource "aws_subnet" "terraform-private-subnet1" {
+  vpc_id            = aws_vpc.terraform-vpc.id
+  cidr_block        = "10.0.4.0/24"
+  availability_zone = "us-east-1a"
+  tags = {
+    Name = "private-subnet1-terra"
+  }
+}
+
+# Create Private Subnet-2
+
+resource "aws_subnet" "terraform-private-subnet2" {
+  vpc_id            = aws_vpc.terraform-vpc.id
+  cidr_block        = "10.0.5.0/24"
+  availability_zone = "us-east-1b"
+  tags = {
+    Name = "private-subnet2-terra"
+  }
+}
+
+# Create Private Subnet-3
+
+resource "aws_subnet" "terraform-private-subnet3" {
+  vpc_id            = aws_vpc.terraform-vpc.id
+  cidr_block        = "10.0.6.0/24"
+  availability_zone = "us-east-1c"
+  tags = {
+    Name = "private-subnet3-terra"
+  }
+}
+
+# Create a network ACL for the subnet
+
+resource "aws_network_acl" "terraform-network_acl" {
+  vpc_id = aws_vpc.terraform-vpc.id
+  subnet_ids = [aws_subnet.terraform-private-subnet1.id, aws_subnet.terraform-private-subnet2.id, aws_subnet.terraform-private-subnet3.id]
+
+  ingress {
+    rule_no = 100
+    protocol    = "tcp"
+    action      = "allow"
+    cidr_block  = "0.0.0.0/0"
+    from_port   = 80
+    to_port     = 80
+  }
+
+  egress {
+    rule_no = 100
+    protocol    = "-1"
+    action      = "allow"
+    cidr_block  = "0.0.0.0/0"
+    from_port   = 0
+    to_port     = 0
+  }
+}
+
+# Associate public subnet 1 with route table
+
+resource "aws_route_table_association" "terraform-public-subnet1-association" {
+  subnet_id      = aws_subnet.terraform-public-subnet1.id
   route_table_id = aws_route_table.terraform-route-table.id
 }
 
-# Associate subnet 2 with route table
+# Associate public subnet 2 with route table
 
-resource "aws_route_table_association" "terraform-subnet2-association" {
-  subnet_id      = aws_subnet.terraform-subnet2.id
+resource "aws_route_table_association" "terraform-public-subnet2-association" {
+  subnet_id      = aws_subnet.terraform-public-subnet2.id
   route_table_id = aws_route_table.terraform-route-table.id
 }
 
-# Associate subnet 3 with route table
+# Associate public subnet 3 with route table
 
-resource "aws_route_table_association" "terraform-subnet3-association" {
-  subnet_id      = aws_subnet.terraform-subnet3.id
+resource "aws_route_table_association" "terraform-public-subnet3-association" {
+  subnet_id      = aws_subnet.terraform-public-subnet3.id
   route_table_id = aws_route_table.terraform-route-table.id
+}
+
+# Associate private subnet 1 with route table
+
+resource "aws_route_table_association" "terraform-private-subnet1-association" {
+  subnet_id      = aws_subnet.terraform-private-subnet1.id
+  route_table_id = aws_route_table.terraform-route-table.id
+}
+
+# Associate private subnet 2 with route table
+
+resource "aws_route_table_association" "terraform-private-subnet2-association" {
+  subnet_id      = aws_subnet.terraform-private-subnet2.id
+  route_table_id = aws_route_table.terraform-route-table.id
+}
+
+# Associate private subnet 3 with route table
+
+resource "aws_route_table_association" "terraform-private-subnet3-association" {
+  subnet_id      = aws_subnet.terraform-private-subnet3.id
+  route_table_id = aws_route_table.terraform-route-table.id
+}
+
+# Create a security group for the load balancer
+
+resource "aws_security_group" "terraform-load_balancer_sg" {
+  name        = "load-balancer-sg"
+  description = "Security group for the load balancer"
+  vpc_id      = aws_vpc.terraform-vpc.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 # Create Security Group to allow port 22, 80 and 443
@@ -121,6 +269,7 @@ resource "aws_security_group" "terraform-security-grp-rule" {
     protocol         = "tcp"
     cidr_blocks      = ["0.0.0.0/0"]
     ipv6_cidr_blocks = ["::/0"]
+    security_groups = [aws_security_group.terraform-load_balancer_sg.id]
   }
 
   ingress {
@@ -148,38 +297,26 @@ resource "aws_security_group" "terraform-security-grp-rule" {
 # Create a Network Interface with an IP in subnet 1 
 
 resource "aws_network_interface" "terraform-network1-interface" {
-  subnet_id       = aws_subnet.terraform-subnet1.id
-  private_ips     = ["10.0.1.50"]
+  subnet_id       = aws_subnet.terraform-private-subnet1.id
+  private_ips     = ["10.0.4.50"]
   security_groups = [aws_security_group.terraform-security-grp-rule.id]
 }
 
 # Create a Network Interface with an IP in subnet 2
 
 resource "aws_network_interface" "terraform-network2-interface" {
-  subnet_id       = aws_subnet.terraform-subnet2.id
-  private_ips     = ["10.0.2.50"]
+  subnet_id       = aws_subnet.terraform-private-subnet2.id
+  private_ips     = ["10.0.5.50"]
   security_groups = [aws_security_group.terraform-security-grp-rule.id]
 }
 
 # Create a Network Interface with an IP in subnet 3
 
 resource "aws_network_interface" "terraform-network3-interface" {
-  subnet_id       = aws_subnet.terraform-subnet3.id
-  private_ips     = ["10.0.3.50"]
+  subnet_id       = aws_subnet.terraform-private-subnet3.id
+  private_ips     = ["10.0.6.50"]
   security_groups = [aws_security_group.terraform-security-grp-rule.id]
 }
-
-# Assign an elastic IP to the network interface created in step 7
-
-# resource "aws_eip" "terraform-eip" {
-#   vpc                       = true
-#   network_interface         = aws_network_interface.terraform-network-interface.id
-#   associate_with_private_ip = "10.0.1.50"
-#   depends_on                = [aws_internet_gateway.terraform-internet-gateway, aws_subnet.terraform-subnet, aws_instance.terraform-server]
-#   tags = {
-#     Name = "eip-terra"
-#   }
-# }
 
 # Create Ubuntu server 1 and install/enable nginx
 
@@ -247,12 +384,13 @@ resource "aws_instance" "terraform-server3" {
 # Create an Application Load Balancer
 
 resource "aws_lb" "terraform-load-balancer" {
-  name               = "loadbalancer-terra"
-  internal           = false
-  security_groups    = [aws_security_group.terraform-security-grp-rule.id]
-  subnets            = [aws_subnet.terraform-subnet1.id, aws_subnet.terraform-subnet2.id, aws_subnet.terraform-subnet3.id]
+  name            = "loadbalancer-terra"
+  internal        = false
+  security_groups = [aws_security_group.terraform-security-grp-rule.id]
+  subnets         = [aws_subnet.terraform-public-subnet1.id, aws_subnet.terraform-public-subnet2.id, aws_subnet.terraform-public-subnet3.id]
 
   enable_deletion_protection = false
+  depends_on                 = [aws_instance.terraform-server1, aws_instance.terraform-server2, aws_instance.terraform-server3]
 }
 
 # Create the target group
@@ -281,18 +419,18 @@ resource "aws_lb_listener" "terraform-listener" {
 
 resource "aws_lb_target_group_attachment" "target-group-attachment-terraform1" {
   target_group_arn = aws_lb_target_group.terraform-target-group.arn
-  target_id      = aws_instance.terraform-server1.id
-  port           = 80
+  target_id        = aws_instance.terraform-server1.id
+  port             = 80
 }
 
 resource "aws_lb_target_group_attachment" "target-group-attachment-terraform2" {
   target_group_arn = aws_lb_target_group.terraform-target-group.arn
-  target_id      = aws_instance.terraform-server2.id
-  port           = 80
+  target_id        = aws_instance.terraform-server2.id
+  port             = 80
 }
 
 resource "aws_lb_target_group_attachment" "target-group-attachment-terraform3" {
   target_group_arn = aws_lb_target_group.terraform-target-group.arn
-  target_id      = aws_instance.terraform-server3.id
-  port           = 80
+  target_id        = aws_instance.terraform-server3.id
+  port             = 80
 }
