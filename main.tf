@@ -48,9 +48,9 @@ resource "aws_nat_gateway" "terraform-nat-gateway" {
   depends_on = [aws_internet_gateway.terraform-internet-gateway]
 }
 
-# Create Custom Route Table
+# Create public Route Table
 
-resource "aws_route_table" "terraform-route-table" {
+resource "aws_route_table" "terraform-route-table-public" {
   vpc_id = aws_vpc.terraform-vpc.id
 
   route {
@@ -58,43 +58,105 @@ resource "aws_route_table" "terraform-route-table" {
     gateway_id = aws_internet_gateway.terraform-internet-gateway.id
   }
 
-  # route {
-  #   cidr_block = "10.0.2.0/24"
-  #   gateway_id = aws_internet_gateway.terraform-internet-gateway.id
-  # }
-
-  # route {
-  #   cidr_block = "10.0.3.0/24"
-  #   gateway_id = aws_internet_gateway.terraform-internet-gateway.id
-  # }
-
-  route {
-    cidr_block     = "10.0.4.0/24"
-    nat_gateway_id = aws_nat_gateway.terraform-nat-gateway.id
+  tags = {
+    Name = "route-table-public-terra"
   }
+}
+
+# Create private1 Route Table
+
+resource "aws_route_table" "terraform-route-table-private1" {
+  vpc_id = aws_vpc.terraform-vpc.id
 
   route {
-    cidr_block     = "10.0.5.0/24"
-    nat_gateway_id = aws_nat_gateway.terraform-nat-gateway.id
-  }
-
-  route {
-    cidr_block     = "10.0.6.0/24"
+    cidr_block     = "0.0.0.0/0"
     nat_gateway_id = aws_nat_gateway.terraform-nat-gateway.id
   }
 
   tags = {
-    Name = "route-table-terra"
+    Name = "route-table-private1-terra"
   }
+}
+
+# Create private2 Route Table
+
+resource "aws_route_table" "terraform-route-table-private2" {
+  vpc_id = aws_vpc.terraform-vpc.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.terraform-nat-gateway.id
+  }
+
+  tags = {
+    Name = "route-table-private2-terra"
+  }
+}
+
+# Create private3 Route Table
+
+resource "aws_route_table" "terraform-route-table-private3" {
+  vpc_id = aws_vpc.terraform-vpc.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.terraform-nat-gateway.id
+  }
+
+  tags = {
+    Name = "route-table-private3-terra"
+  }
+}
+
+# Associate public subnet 1 with public route table
+
+resource "aws_route_table_association" "terraform-public-subnet1-association" {
+  subnet_id      = aws_subnet.terraform-public-subnet1.id
+  route_table_id = aws_route_table.terraform-route-table-public.id
+}
+
+# Associate public subnet 2 with public route table
+
+resource "aws_route_table_association" "terraform-public-subnet2-association" {
+  subnet_id      = aws_subnet.terraform-public-subnet2.id
+  route_table_id = aws_route_table.terraform-route-table-public.id
+}
+
+# Associate public subnet 3 with public route table
+
+resource "aws_route_table_association" "terraform-public-subnet3-association" {
+  subnet_id      = aws_subnet.terraform-public-subnet3.id
+  route_table_id = aws_route_table.terraform-route-table-public.id
+}
+
+# Associate private subnet 1 with private1 route table
+
+resource "aws_route_table_association" "terraform-private-subnet1-association" {
+  subnet_id      = aws_subnet.terraform-private-subnet1.id
+  route_table_id = aws_route_table.terraform-route-table-private1.id
+}
+
+# Associate private subnet 2 with private2 route table
+
+resource "aws_route_table_association" "terraform-private-subnet2-association" {
+  subnet_id      = aws_subnet.terraform-private-subnet2.id
+  route_table_id = aws_route_table.terraform-route-table-private2.id
+}
+
+# Associate private subnet 3 with private3 route table
+
+resource "aws_route_table_association" "terraform-private-subnet3-association" {
+  subnet_id      = aws_subnet.terraform-private-subnet3.id
+  route_table_id = aws_route_table.terraform-route-table-private3.id
 }
 
 # Create Public Subnet-1
 
 resource "aws_subnet" "terraform-public-subnet1" {
-  vpc_id     = aws_vpc.terraform-vpc.id
-  cidr_block = "10.0.1.0/24"
-  # map_public_ip_on_launch = true
-  availability_zone = "us-east-1a"
+  vpc_id                  = aws_vpc.terraform-vpc.id
+  cidr_block              = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+  availability_zone       = "us-east-1a"
   tags = {
     Name = "public-subnet1-terra"
   }
@@ -160,68 +222,26 @@ resource "aws_subnet" "terraform-private-subnet3" {
 # Create a network ACL for the subnet
 
 resource "aws_network_acl" "terraform-network_acl" {
-  vpc_id = aws_vpc.terraform-vpc.id
+  vpc_id     = aws_vpc.terraform-vpc.id
   subnet_ids = [aws_subnet.terraform-private-subnet1.id, aws_subnet.terraform-private-subnet2.id, aws_subnet.terraform-private-subnet3.id]
 
   ingress {
-    rule_no = 100
-    protocol    = "tcp"
-    action      = "allow"
-    cidr_block  = "0.0.0.0/0"
-    from_port   = 80
-    to_port     = 80
+    rule_no    = 100
+    protocol   = "tcp"
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 80
+    to_port    = 80
   }
 
   egress {
-    rule_no = 100
-    protocol    = "-1"
-    action      = "allow"
-    cidr_block  = "0.0.0.0/0"
-    from_port   = 0
-    to_port     = 0
+    rule_no    = 100
+    protocol   = "-1"
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
   }
-}
-
-# Associate public subnet 1 with route table
-
-resource "aws_route_table_association" "terraform-public-subnet1-association" {
-  subnet_id      = aws_subnet.terraform-public-subnet1.id
-  route_table_id = aws_route_table.terraform-route-table.id
-}
-
-# Associate public subnet 2 with route table
-
-resource "aws_route_table_association" "terraform-public-subnet2-association" {
-  subnet_id      = aws_subnet.terraform-public-subnet2.id
-  route_table_id = aws_route_table.terraform-route-table.id
-}
-
-# Associate public subnet 3 with route table
-
-resource "aws_route_table_association" "terraform-public-subnet3-association" {
-  subnet_id      = aws_subnet.terraform-public-subnet3.id
-  route_table_id = aws_route_table.terraform-route-table.id
-}
-
-# Associate private subnet 1 with route table
-
-resource "aws_route_table_association" "terraform-private-subnet1-association" {
-  subnet_id      = aws_subnet.terraform-private-subnet1.id
-  route_table_id = aws_route_table.terraform-route-table.id
-}
-
-# Associate private subnet 2 with route table
-
-resource "aws_route_table_association" "terraform-private-subnet2-association" {
-  subnet_id      = aws_subnet.terraform-private-subnet2.id
-  route_table_id = aws_route_table.terraform-route-table.id
-}
-
-# Associate private subnet 3 with route table
-
-resource "aws_route_table_association" "terraform-private-subnet3-association" {
-  subnet_id      = aws_subnet.terraform-private-subnet3.id
-  route_table_id = aws_route_table.terraform-route-table.id
 }
 
 # Create a security group for the load balancer
@@ -238,10 +258,38 @@ resource "aws_security_group" "terraform-load_balancer_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "icmp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -254,39 +302,63 @@ resource "aws_security_group" "terraform-security-grp-rule" {
   vpc_id      = aws_vpc.terraform-vpc.id
 
   ingress {
-    description      = "HTTPS"
-    from_port        = 443
-    to_port          = 443
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description      = "HTTP"
-    from_port        = 80
-    to_port          = 80
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+    description     = "HTTP"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    cidr_blocks     = ["0.0.0.0/0"]
     security_groups = [aws_security_group.terraform-load_balancer_sg.id]
   }
 
   ingress {
-    description      = "SSH"
-    from_port        = 22
-    to_port          = 22
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
@@ -315,6 +387,13 @@ resource "aws_network_interface" "terraform-network2-interface" {
 resource "aws_network_interface" "terraform-network3-interface" {
   subnet_id       = aws_subnet.terraform-private-subnet3.id
   private_ips     = ["10.0.6.50"]
+  security_groups = [aws_security_group.terraform-security-grp-rule.id]
+}
+
+# Create a Network Interface for bastion host
+
+resource "aws_network_interface" "terraform-network4-interface" {
+  subnet_id       = aws_subnet.terraform-public-subnet1.id
   security_groups = [aws_security_group.terraform-security-grp-rule.id]
 }
 
@@ -373,6 +452,27 @@ resource "aws_instance" "terraform-server3" {
   }
   tags = {
     Name = "server-terra3"
+  }
+  user_data = <<-EOF
+                #!/bin/bash
+                sudo apt update -y
+                sudo apt install nginx -y
+                EOF
+}
+
+# Create a bastion host
+
+resource "aws_instance" "terraform-bastion-host" {
+  ami               = "ami-0574da719dca65348"
+  instance_type     = "t2.micro"
+  availability_zone = "us-east-1a"
+  key_name          = "barraghanvirus"
+  network_interface {
+    network_interface_id = aws_network_interface.terraform-network4-interface.id
+    device_index         = 0
+  }
+  tags = {
+    Name = "bastion-host-terra"
   }
   user_data = <<-EOF
                 #!/bin/bash
